@@ -53,7 +53,8 @@ def get_named_kw_args(fn):
     params = inspect.signature(fn).parameters
     for name, param in params.items():
         if param.kind == inspect.Parameter.KEYWORD_ONLY:
-            return True
+            args.append(name)
+    return tuple(args)
 
 def has_named_kw_args(fn):
     params = inspect.signature(fn).parameters
@@ -96,18 +97,18 @@ class RequestHandler(object):
         if self._has_var_kw_arg or self._has_named_kw_args or self._required_kw_args:
             if request.method == 'POST':
                 if not request.content_type:
-                    return web.HTTPBadRequest('Missing Content-Type.')
+                    return web.HTTPBadRequest()
                 ct = request.content_type.lower()
                 if ct.startwith('application/json'):
                     params = await request.json()
                     if not isinstance(params, dict):
-                        return web.HTTPBadRequest('JSON body must be object.')
+                        return web.HTTPBadRequest()
                     kw = params
                 elif ct.startwith('application/x-www-form-urlencoded') or ct.startwith('multipart/form-data'):
                     params = await request.post()
                     kw = dict(**params)
                 else:
-                    return web.HTTPBadRequest('Unsupported Content-type: %s' % request.content_type)
+                    return web.HTTPBadRequest()
             if request.method == 'GET':
                 qs = request.query_string
                 if qs:
@@ -136,7 +137,7 @@ class RequestHandler(object):
         if self._required_kw_args:
             for name in self._required_kw_args:
                 if not name in kw:
-                    return web.HTTPBadRequest('Missing argument: %s' % name)
+                    return web.HTTPBadRequest()
         logging.info('call with args: %s' % str(kw))
         try:
             r = await self._func(**kw)
@@ -174,4 +175,4 @@ class RequestHandler(object):
                 method = getattr(fn, '__method__', None)
                 path = getattr(fn, '__route__', None)
                 if method and path:
-                    add_route(app, fn)
+                    self.add_route(app, fn)
